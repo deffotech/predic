@@ -39,11 +39,11 @@ export async function updateVoter(id: string, voterUpdate: UpdatableVoter) {
 
 export async function deleteVoter(id: string) {
   await sleep(1000); // Simulate DB call
-  const initialLength = voters.length;
-  voters = voters.filter((v) => v.id !== id);
-  if (voters.length === initialLength) {
+  const voterIndex = voters.findIndex((v) => v.id === id);
+  if (voterIndex === -1) {
     return { success: false, error: "Voter not found" };
   }
+  voters.splice(voterIndex, 1);
   revalidatePath("/map");
   revalidatePath("/dashboard");
   return { success: true };
