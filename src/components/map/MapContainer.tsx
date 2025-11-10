@@ -60,6 +60,16 @@ export default function MapContainer({ initialVoters, apiKey }: MapContainerProp
     }
     handleDialogClose();
   };
+  
+  const handleMapClick = (ev: google.maps.MapMouseEvent) => {
+    if (ev.latLng) {
+      setDialogState({ 
+        mode: 'add', 
+        voter: null, 
+        coords: ev.latLng.toJSON() 
+      });
+    }
+  };
 
   const handleAddClick = () => {
     navigator.geolocation.getCurrentPosition(
@@ -151,7 +161,7 @@ export default function MapContainer({ initialVoters, apiKey }: MapContainerProp
                 <DialogHeader>
                     <DialogTitle>{mode === 'add' ? 'Add New Voter' : 'Edit Voter'}</DialogTitle>
                     <DialogDescription>
-                        {mode === 'add' ? 'A new voter will be added at your current location.' : 'Update the voter\'s information.'}
+                        {mode === 'add' ? 'Enter the details for the new voter at the selected location.' : 'Update the voter\'s information.'}
                     </DialogDescription>
                 </DialogHeader>
                 <VoterForm 
@@ -179,6 +189,7 @@ export default function MapContainer({ initialVoters, apiKey }: MapContainerProp
           gestureHandling={"greedy"}
           disableDefaultUI={true}
           className="w-full h-full"
+          onClick={handleMapClick}
         >
           {voters.map((voter) => (
             <AdvancedMarker
