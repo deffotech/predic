@@ -64,17 +64,23 @@ export default function MapContainer({ initialVoters, apiKey }: MapContainerProp
   const handleAddClick = () => {
     navigator.geolocation.getCurrentPosition(
       (position) => {
+        const newCoords = {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        };
+        setCenter(newCoords);
+        setZoom(15);
         setDialogState({ 
             mode: 'add', 
             voter: null, 
-            coords: { lat: position.coords.latitude, lng: position.coords.longitude }
+            coords: newCoords
         });
       },
       () => {
         toast({
           variant: "destructive",
           title: "Location Error",
-          description: "Could not get your location. Please enable location services.",
+          description: "Could not get your location. Please enable location services and grant permission.",
         });
       }
     );
@@ -192,13 +198,13 @@ export default function MapContainer({ initialVoters, apiKey }: MapContainerProp
               size="lg"
               className="absolute bottom-6 right-6 z-10 shadow-lg rounded-full h-16 w-16"
               onClick={handleAddClick}
-              aria-label="Add Voter"
+              aria-label="Add Voter At Current Location"
             >
-              <Plus size={32} />
+              <MapPinPlus size={32} />
             </Button>
           </TooltipTrigger>
           <TooltipContent>
-            <p>Add Voter</p>
+            <p>Add Voter At Current Location</p>
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
