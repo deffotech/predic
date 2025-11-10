@@ -16,5 +16,9 @@ export default async function MapPage() {
     );
   }
 
-  return <MapContainer initialVoters={voters} apiKey={apiKey} />;
+  return (
+    <div className="flex-1 h-full">
+        <MapContainer initialVoters={voters} apiKey={apiKey} />
+    </div>
+  );
 }

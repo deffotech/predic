@@ -161,7 +161,7 @@ export default function MapContainer({ initialVoters, apiKey }: MapContainerProp
   }
 
   return (
-    <div className="flex-1 flex flex-col relative h-full">
+    <div className="w-full h-full">
       <APIProvider apiKey={apiKey}>
         <Map
           mapId={"votemapper-map"}
