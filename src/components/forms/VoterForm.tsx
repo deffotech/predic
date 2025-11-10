@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useForm } from "react-hook-form";
@@ -20,6 +21,8 @@ const formSchema = z.object({
   age: z.coerce.number().int().min(18, "Voter must be 18 or older.").max(120),
   party: z.enum(parties),
   notes: z.string().max(500, "Notes must be 500 characters or less.").optional(),
+  lat: z.coerce.number(),
+  lng: z.coerce.number(),
 });
 
 type VoterFormValues = z.infer<typeof formSchema>;
@@ -43,6 +46,8 @@ export default function VoterForm({ voter, coords, onSuccess, onCancel }: VoterF
       age: voter?.age ?? 18,
       party: voter?.party,
       notes: voter?.notes ?? "",
+      lat: voter?.lat ?? coords?.lat,
+      lng: voter?.lng ?? coords?.lng,
     },
   });
 
@@ -50,8 +55,7 @@ export default function VoterForm({ voter, coords, onSuccess, onCancel }: VoterF
     setIsLoading(true);
     try {
       if (mode === 'add') {
-        if (!coords) throw new Error("Coordinates are missing.");
-        const result = await addVoter({ ...data, lat: coords.lat, lng: coords.lng });
+        const result = await addVoter(data);
         if (result.success && result.voter) {
           toast({ title: "Success", description: "Voter added successfully." });
           onSuccess(result.voter, 'add');
@@ -133,6 +137,34 @@ export default function VoterForm({ voter, coords, onSuccess, onCancel }: VoterF
             )}
           />
         </div>
+         <div className="grid grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="lat"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Latitude</FormLabel>
+                <FormControl>
+                  <Input type="number" {...field} readOnly disabled />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="lng"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Longitude</FormLabel>
+                <FormControl>
+                  <Input type="number" {...field} readOnly disabled />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
         <FormField
           control={form.control}
           name="notes"
@@ -159,3 +191,4 @@ export default function VoterForm({ voter, coords, onSuccess, onCancel }: VoterF
     </Form>
   );
 }
+

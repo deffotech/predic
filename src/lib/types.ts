@@ -1,3 +1,4 @@
+
 export const parties = ["Saffron", "Red", "Black", "White", "Yellow", "Green"] as const;
 
 export type Party = (typeof parties)[number];
@@ -14,4 +15,4 @@ export type Voter = {
 };
 
 export type NewVoter = Omit<Voter, "id" | "createdAt">;
-export type UpdatableVoter = Partial<Omit<Voter, "id" | "createdAt" | "lat" | "lng">>;
+export type UpdatableVoter = Partial<Omit<Voter, "id" | "createdAt">>;
