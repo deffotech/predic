@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { deleteVoter } from "@/lib/actions";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Badge } from "../ui/badge";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui/tooltip";
 
 type MapContainerProps = {
   initialVoters: Voter[];
@@ -144,7 +145,7 @@ export default function MapContainer({ initialVoters, apiKey }: MapContainerProp
                 <DialogHeader>
                     <DialogTitle>{mode === 'add' ? 'Add New Voter' : 'Edit Voter'}</DialogTitle>
                     <DialogDescription>
-                        {mode === 'add' ? 'Your current location will be saved.' : 'Update the voter\'s information.'}
+                        {mode === 'add' ? 'A new voter will be added at your current location.' : 'Update the voter\'s information.'}
                     </DialogDescription>
                 </DialogHeader>
                 <VoterForm 
@@ -184,14 +185,23 @@ export default function MapContainer({ initialVoters, apiKey }: MapContainerProp
           ))}
         </Map>
       </APIProvider>
-      <Button
-        size="lg"
-        className="absolute bottom-6 right-6 z-10 shadow-lg rounded-full h-16 w-16"
-        onClick={handleAddClick}
-      >
-        <MapPinPlus size={32} />
-        <span className="sr-only">Add Voter</span>
-      </Button>
+       <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              size="lg"
+              className="absolute bottom-6 right-6 z-10 shadow-lg rounded-full h-16 w-16"
+              onClick={handleAddClick}
+              aria-label="Add Voter"
+            >
+              <Plus size={32} />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>Add Voter</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
       <Dialog open={!!dialogState} onOpenChange={(isOpen) => !isOpen && handleDialogClose()}>
         {renderDialogContent()}
       </Dialog>
