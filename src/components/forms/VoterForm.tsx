@@ -145,7 +145,7 @@ export default function VoterForm({ voter, coords, onSuccess, onCancel }: VoterF
               <FormItem>
                 <FormLabel>Latitude</FormLabel>
                 <FormControl>
-                  <Input type="number" {...field} readOnly disabled />
+                  <Input type="number" step="any" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -158,7 +158,7 @@ export default function VoterForm({ voter, coords, onSuccess, onCancel }: VoterF
               <FormItem>
                 <FormLabel>Longitude</FormLabel>
                 <FormControl>
-                  <Input type="number" {...field} readOnly disabled />
+                  <Input type="number" step="any" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -191,4 +191,3 @@ export default function VoterForm({ voter, coords, onSuccess, onCancel }: VoterF
     </Form>
   );
 }
-
