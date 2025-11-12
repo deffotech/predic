@@ -84,7 +84,7 @@ function MapContent({ initialVoters, apiKey }: MapContainerProps) {
             }
         );
     }
-  }, [search_params, openAddDialogAtCurrentLocation]);
+  }, [searchParams, openAddDialogAtCurrentLocation]);
   
   const handleDialogClose = () => setDialogState(null);
 
