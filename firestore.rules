@@ -1,52 +1,17 @@
-/**
- * @fileoverview Firestore Security Rules for the VoterInfo application.
- *
- * Core Philosophy:
- * This ruleset allows public read access to voter information, while restricting write access to authenticated users who must provide a matching document ID during creation.
- * Updates and deletes are disallowed.
- *
- * Data Structure:
- * Voter information is stored in the top-level `/voterInfo/{voterInfoId}` collection.
- *
- * Key Security Decisions:
- * - Public read access is enabled for all voter information.
- * - Only authenticated users can create new voter information entries.
- * - Updates and deletes are explicitly disallowed to prevent unauthorized modification of voter data.
- * - No schema validation is performed beyond authorization-critical fields, allowing for rapid prototyping.
- *
- * Denormalization for Authorization:
- * The `voterInfoId` is used to ensure that the document ID in the path matches the `id` field in the document data during creation, enforcing a type of ownership.
- */
+
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Rules for the voters collection
+    match /voters/{voterId} {
+      // Anyone can read the list of voters or individual voter data.
+      // This is necessary for the public map and dashboard.
+      allow read: if true;
 
-    /**
-     * @description Rules for the /voterInfo/{voterInfoId} collection. Allows public reads and owner-only creation, disallowing updates and deletes.
-     * @path /voterInfo/{voterInfoId}
-     * @allow (get, list) - Any user can read voter information.
-     * @allow (create) - Authenticated user can create a new voterInfo document if the document id matches the `id` field in the data.
-     * @deny (update, delete) - No user can update or delete existing voter information.
-     * @principle Public read access with owner-only writes is used for voter information.
-     */
-    match /voterInfo/{voterInfoId} {
-      // Allow anyone to read the voter information
-      allow get: if true;
-      allow list: if true;
-
-      // Allow create only if the user is signed in and the document id matches the 'id' field in the data
-      allow create: if isSignedIn() && request.resource.data.id == voterInfoId;
-
-      // Disallow update and delete operations
-      allow update: if false;
-      allow delete: if false;
-    }
-
-    /**
-     * @description Checks if the user is signed in.
-     */
-    function isSignedIn() {
-      return request.auth != null;
+      // Only authenticated users can create, update, or delete voter data.
+      // In a production app, you might want to add more specific roles or ownership checks.
+      allow write: if request.auth != null;
     }
   }
 }

@@ -1,6 +1,7 @@
+
 "use client";
 
-import { useState, useEffect, useCallback, Suspense } from "react";
+import { useState, useEffect, useCallback, Suspense, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import { APIProvider, Map, AdvancedMarker } from "@vis.gl/react-google-maps";
 import type { Voter } from "@/lib/types";
@@ -15,6 +16,8 @@ import { deleteVoter } from "@/lib/actions";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Badge } from "../ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui/tooltip";
+import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
+import { collection } from "firebase/firestore";
 
 type MapContainerProps = {
   initialVoters: Voter[];
@@ -28,7 +31,10 @@ type DialogState = {
 } | null;
 
 function MapContent({ initialVoters, apiKey }: MapContainerProps) {
-  const [voters, setVoters] = useState(initialVoters);
+  const firestore = useFirestore();
+  const votersQuery = useMemoFirebase(() => firestore && collection(firestore, 'voters'), [firestore]);
+  const { data: voters, isLoading: isLoadingVoters } = useCollection<Voter>(votersQuery);
+
   const [center, setCenter] = useState({ lat: 20.5937, lng: 78.9629 }); // Default to India
   const [zoom, setZoom] = useState(5);
   const [dialogState, setDialogState] = useState<DialogState>(null);
@@ -78,16 +84,12 @@ function MapContent({ initialVoters, apiKey }: MapContainerProps) {
             }
         );
     }
-  }, [searchParams, openAddDialogAtCurrentLocation]);
+  }, [search_params, openAddDialogAtCurrentLocation]);
   
   const handleDialogClose = () => setDialogState(null);
 
   const handleFormSuccess = (updatedVoter: Voter, mode: 'add' | 'edit') => {
-    if (mode === 'add') {
-      setVoters(prev => [...prev, updatedVoter]);
-    } else {
-      setVoters(prev => prev.map(v => v.id === updatedVoter.id ? updatedVoter : v));
-    }
+    // No need to update local state, useCollection handles it
     handleDialogClose();
   };
   
@@ -109,7 +111,6 @@ function MapContent({ initialVoters, apiKey }: MapContainerProps) {
     setIsDeleting(true);
     const result = await deleteVoter(voterId);
     if (result.success) {
-      setVoters(prev => prev.filter(v => v.id !== voterId));
       toast({ title: "Success", description: "Voter data deleted." });
       handleDialogClose();
     } else {
@@ -210,7 +211,8 @@ function MapContent({ initialVoters, apiKey }: MapContainerProps) {
           className="w-full h-full"
           onClick={handleMapClick}
         >
-          {voters.map((voter) => (
+          {isLoadingVoters && <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"><Loader2 className="h-10 w-10 animate-spin" /></div>}
+          {voters?.map((voter) => (
             <AdvancedMarker
               key={voter.id}
               position={{ lat: voter.lat, lng: voter.lng }}

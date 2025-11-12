@@ -1,8 +1,13 @@
-import { getVoters } from "@/lib/actions";
+
 import MapContainer from "@/components/map/MapContainer";
+import { getVoters } from "@/lib/actions";
+
+// This page is now mostly a client component container.
+// initialVoters can be passed for faster initial load, but the component
+// will switch to a real-time stream from Firestore.
 
 export default async function MapPage() {
-  const voters = await getVoters();
+  const initialVoters = await getVoters();
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
 
   if (!apiKey) {
@@ -18,7 +23,7 @@ export default async function MapPage() {
 
   return (
     <div className="flex-1 h-full">
-        <MapContainer initialVoters={voters} apiKey={apiKey} />
+        <MapContainer initialVoters={initialVoters} apiKey={apiKey} />
     </div>
   );
 }

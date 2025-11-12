@@ -1,51 +1,133 @@
 
-"use server";
+'use server';
 
-import { revalidatePath } from "next/cache";
-import { voters } from "./data";
-import type { NewVoter, UpdatableVoter, Voter } from "./types";
+import { revalidatePath } from 'next/cache';
+import {
+  collection,
+  addDoc,
+  getDocs,
+  doc,
+  updateDoc,
+  deleteDoc,
+  serverTimestamp,
+  getDoc,
+} from 'firebase/firestore';
+import { getSdks } from '@/firebase';
+import { initializeFirebase } from '@/firebase';
+import type { NewVoter, UpdatableVoter, Voter } from './types';
 
-// Simulate network latency
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+// This function now uses a server-side initialized Firebase instance
+async function getFirestoreInstance() {
+  const { firestore } = initializeFirebase();
+  return firestore;
+}
 
 export async function getVoters(): Promise<Voter[]> {
-  await sleep(500); // Simulate DB call
-  return voters;
+  const db = await getFirestoreInstance();
+  const votersCol = collection(db, 'voters');
+  const voterSnapshot = await getDocs(votersCol);
+  const votersList = voterSnapshot.docs.map((doc) => {
+    const data = doc.data();
+    return {
+      id: doc.id,
+      name: data.name,
+      age: data.age,
+      party: data.party,
+      address: data.address,
+      peopleInHouse: data.peopleInHouse,
+      designation: data.designation,
+      lat: data.lat,
+      lng: data.lng,
+      notes: data.notes,
+      // Convert Firestore Timestamp to ISO string
+      createdAt: data.createdAt?.toDate()?.toISOString() || new Date().toISOString(),
+    } as Voter;
+  });
+  return votersList;
 }
 
 export async function addVoter(voter: NewVoter) {
-  await sleep(1000); // Simulate DB call
-  const newVoter: Voter = {
-    ...voter,
-    id: (voters.length + 1).toString(),
-    createdAt: new Date().toISOString(),
-  };
-  voters.push(newVoter);
-  revalidatePath("/map");
-  revalidatePath("/dashboard");
-  return { success: true, voter: newVoter };
+  try {
+    const db = await getFirestoreInstance();
+    const docRef = await addDoc(collection(db, 'voters'), {
+      ...voter,
+      createdAt: serverTimestamp(),
+    });
+
+    // Fetch the newly created document to return it
+    const newDoc = await getDoc(docRef);
+    if (!newDoc.exists()) {
+       return { success: false, error: "Failed to fetch newly created voter." };
+    }
+    
+    const newVoterData = newDoc.data();
+    const newVoter: Voter = {
+        id: newDoc.id,
+        ...voter,
+        // Convert timestamp to string for client
+        createdAt: newVoterData.createdAt?.toDate()?.toISOString() || new Date().toISOString(),
+    };
+    
+    revalidatePath('/map');
+    revalidatePath('/dashboard');
+    return { success: true, voter: newVoter };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'An unknown error occurred';
+    console.error('Error adding voter:', message);
+    return { success: false, error: message };
+  }
 }
 
 export async function updateVoter(id: string, voterUpdate: UpdatableVoter) {
-  await sleep(1000); // Simulate DB call
-  const voterIndex = voters.findIndex((v) => v.id === id);
-  if (voterIndex === -1) {
-    return { success: false, error: "Voter not found" };
+   try {
+    const db = await getFirestoreInstance();
+    const voterRef = doc(db, 'voters', id);
+    await updateDoc(voterRef, {
+        ...voterUpdate,
+        updatedAt: serverTimestamp()
+    });
+
+    const updatedDoc = await getDoc(voterRef);
+     if (!updatedDoc.exists()) {
+       return { success: false, error: "Voter not found after update." };
+    }
+
+    const updatedData = updatedDoc.data();
+    const updatedVoter: Voter = {
+        id: updatedDoc.id,
+        name: updatedData.name,
+        age: updatedData.age,
+        party: updatedData.party,
+        address: updatedData.address,
+        peopleInHouse: updatedData.peopleInHouse,
+        designation: updatedData.designation,
+        lat: updatedData.lat,
+        lng: updatedData.lng,
+        notes: updatedData.notes,
+        createdAt: updatedData.createdAt?.toDate()?.toISOString() || new Date().toISOString(),
+    };
+
+
+    revalidatePath('/map');
+    revalidatePath('/dashboard');
+    return { success: true, voter: updatedVoter };
+  } catch (error) {
+     const message = error instanceof Error ? error.message : 'An unknown error occurred';
+    console.error('Error updating voter:', message);
+    return { success: false, error: message };
   }
-  voters[voterIndex] = { ...voters[voterIndex], ...voterUpdate };
-  revalidatePath("/map");
-  revalidatePath("/dashboard");
-  return { success: true, voter: voters[voterIndex] };
 }
 
 export async function deleteVoter(id: string) {
-  await sleep(1000); // Simulate DB call
-  const voterIndex = voters.findIndex((v) => v.id === id);
-  if (voterIndex === -1) {
-    return { success: false, error: "Voter not found" };
+   try {
+    const db = await getFirestoreInstance();
+    await deleteDoc(doc(db, 'voters', id));
+    revalidatePath('/map');
+    revalidatePath('/dashboard');
+    return { success: true };
+  } catch (error) {
+     const message = error instanceof Error ? error.message : 'An unknown error occurred';
+    console.error('Error deleting voter:', message);
+    return { success: false, error: message };
   }
-  voters.splice(voterIndex, 1);
-  revalidatePath("/map");
-  revalidatePath("/dashboard");
-  return { success: true };
 }

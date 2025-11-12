@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useMemo } from 'react';
@@ -5,27 +6,32 @@ import type { Voter, Party } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { Download, Users, Vote, CheckCircle } from 'lucide-react';
+import { Download, Users, Vote, CheckCircle, Loader2 } from 'lucide-react';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartConfig } from '@/components/ui/chart';
 import { Bar, BarChart, XAxis, YAxis } from 'recharts';
 import { PARTY_COLORS, PARTY_COLORS_HSL } from '@/lib/constants';
 import { Badge } from '../ui/badge';
 import { format } from 'date-fns';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { collection } from 'firebase/firestore';
 
 type DashboardClientProps = {
   initialVoters: Voter[];
 };
 
 export default function DashboardClient({ initialVoters }: DashboardClientProps) {
-  const [voters] = useState<Voter[]>(initialVoters);
+  const firestore = useFirestore();
+  const votersQuery = useMemoFirebase(() => firestore && collection(firestore, 'voters'), [firestore]);
+  const { data: voters, isLoading: isLoadingVoters } = useCollection<Voter>(votersQuery);
 
   const stats = useMemo(() => {
-    const partyCounts = voters.reduce((acc, voter) => {
+    const voterData = voters || [];
+    const partyCounts = voterData.reduce((acc, voter) => {
       acc[voter.party] = (acc[voter.party] || 0) + 1;
       return acc;
     }, {} as Record<Party, number>);
 
-    const totalVoters = voters.length;
+    const totalVoters = voterData.length;
 
     const leadingParty = Object.entries(partyCounts).reduce(
       (leader, [party, count]) => (count > leader.count ? { party: party as Party, count } : leader),
@@ -53,8 +59,9 @@ export default function DashboardClient({ initialVoters }: DashboardClientProps)
   }, []);
 
   const handleExport = () => {
+    const dataToExport = voters || [];
     const headers = ['ID', 'Name', 'Age', 'Party', 'Address', '# People', 'Designation', 'Latitude', 'Longitude', 'Notes', 'Date Added'];
-    const rows = voters.map(v => [v.id, v.name, v.age, v.party, `"${v.address}"`, v.peopleInHouse, v.designation, v.lat, v.lng, v.notes?.replace(/"/g, '""') || '', v.createdAt].join(','));
+    const rows = dataToExport.map(v => [v.id, v.name, v.age, v.party, `"${v.address}"`, v.peopleInHouse, v.designation, v.lat, v.lng, v.notes?.replace(/"/g, '""') || '', v.createdAt].join(','));
     const csvContent = "data:text/csv;charset=utf-8," + [headers.join(','), ...rows].join('\n');
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
@@ -74,7 +81,7 @@ export default function DashboardClient({ initialVoters }: DashboardClientProps)
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.totalVoters}</div>
+            <div className="text-2xl font-bold">{isLoadingVoters ? <Loader2 className="h-6 w-6 animate-spin" /> : stats.totalVoters}</div>
             <p className="text-xs text-muted-foreground">Total data points collected</p>
           </CardContent>
         </Card>
@@ -84,7 +91,7 @@ export default function DashboardClient({ initialVoters }: DashboardClientProps)
             <Vote className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-             {stats.leadingParty.party ? (
+             {isLoadingVoters ? <Loader2 className="h-6 w-6 animate-spin" /> : stats.leadingParty.party ? (
                 <>
                 <div className="text-2xl font-bold">{stats.leadingParty.party}</div>
                 <p className="text-xs text-muted-foreground">with {stats.leadingParty.count} predicted votes</p>
@@ -103,7 +110,7 @@ export default function DashboardClient({ initialVoters }: DashboardClientProps)
                 <CardDescription>Download all collected data as a CSV file.</CardDescription>
             </CardHeader>
             <CardContent className="flex-1 flex items-end">
-                <Button onClick={handleExport} className="w-full">
+                <Button onClick={handleExport} className="w-full" disabled={isLoadingVoters || !voters || voters.length === 0}>
                     <Download className="mr-2 h-4 w-4" />
                     Export to CSV
                 </Button>
@@ -146,7 +153,13 @@ export default function DashboardClient({ initialVoters }: DashboardClientProps)
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {voters.length > 0 ? voters.map((voter) => (
+                {isLoadingVoters ? (
+                    <TableRow>
+                        <TableCell colSpan={5} className="h-24 text-center">
+                            <Loader2 className="mx-auto h-8 w-8 animate-spin" />
+                        </TableCell>
+                    </TableRow>
+                ) : voters && voters.length > 0 ? voters.map((voter) => (
                   <TableRow key={voter.id}>
                     <TableCell className="font-medium">{voter.name}</TableCell>
                     <TableCell>

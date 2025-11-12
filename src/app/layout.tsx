@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { Toaster } from "@/components/ui/toaster";
 import Header from '@/components/layout/Header';
 import { AppName } from '@/lib/constants';
+import { FirebaseClientProvider } from '@/firebase';
 
 export const metadata: Metadata = {
   title: AppName,
@@ -24,9 +25,11 @@ export default function RootLayout({
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
       </head>
       <body className={cn("font-body antialiased h-full flex flex-col")}>
-        <Header />
-        <main className="flex-1 flex flex-col min-h-0">{children}</main>
-        <Toaster />
+        <FirebaseClientProvider>
+          <Header />
+          <main className="flex-1 flex flex-col min-h-0">{children}</main>
+          <Toaster />
+        </FirebaseClientProvider>
       </body>
     </html>
   );
