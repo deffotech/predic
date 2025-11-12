@@ -1,0 +1,75 @@
+{
+  "entities": {
+    "VoterInfo": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "VoterInfo",
+      "type": "object",
+      "description": "Stores information about individual voters collected via the contact form.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the VoterInfo entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "Voter's full name."
+        },
+        "age": {
+          "type": "number",
+          "description": "Voter's age."
+        },
+        "partyAffiliation": {
+          "type": "string",
+          "description": "Voter's declared political party affiliation."
+        },
+        "latitude": {
+          "type": "number",
+          "description": "Latitude of the voter's location."
+        },
+        "longitude": {
+          "type": "number",
+          "description": "Longitude of the voter's location."
+        },
+        "additionalInfo": {
+          "type": "string",
+          "description": "Any additional information provided by the voter."
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "age",
+        "partyAffiliation",
+        "latitude",
+        "longitude"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/voterInfo/{voterInfoId}",
+        "definition": {
+          "entityName": "VoterInfo",
+          "schema": {
+            "$ref": "#/backend/entities/VoterInfo"
+          },
+          "description": "Stores information about individual voters. VoterInfo documents are identified by a unique ID.",
+          "params": [
+            {
+              "name": "voterInfoId",
+              "description": "The unique identifier for each voter's information."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The Firestore structure is designed to store voter information collected through a contact form and displayed on an interactive map. A top-level collection, `voterInfo`, stores the `VoterInfo` entities. This design promotes data clarity and enables simple querying. Since no user authentication beyond anonymous is required based on the prompt, all data is stored in a single top-level collection.  The structure facilitates authorization independence as all information required to decide authorization is contained within each document. QAPs are supported because all documents within the `voterInfo` collection share the same security requirements, thus fulfilling structural segregation."
+  }
+}
