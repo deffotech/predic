@@ -12,7 +12,6 @@ import {
   serverTimestamp,
   getDoc,
 } from 'firebase/firestore';
-import { getSdks } from '@/firebase';
 import { initializeFirebase } from '@/firebase';
 import type { NewVoter, UpdatableVoter, Voter } from './types';
 
