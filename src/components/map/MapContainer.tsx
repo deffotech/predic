@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { APIProvider, Map, AdvancedMarker } from "@vis.gl/react-google-maps";
 import type { Voter } from "@/lib/types";
 import { Button } from "@/components/ui/button";
@@ -26,29 +27,58 @@ type DialogState = {
   coords?: { lat: number; lng: number };
 } | null;
 
-export default function MapContainer({ initialVoters, apiKey }: MapContainerProps) {
+function MapContent({ initialVoters, apiKey }: MapContainerProps) {
   const [voters, setVoters] = useState(initialVoters);
   const [center, setCenter] = useState({ lat: 20.5937, lng: 78.9629 }); // Default to India
   const [zoom, setZoom] = useState(5);
   const [dialogState, setDialogState] = useState<DialogState>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const { toast } = useToast();
+  const searchParams = useSearchParams();
 
-  useEffect(() => {
+  const openAddDialogAtCurrentLocation = useCallback(() => {
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        setCenter({
+        const newCoords = {
           lat: position.coords.latitude,
           lng: position.coords.longitude,
+        };
+        setCenter(newCoords);
+        setZoom(15);
+        setDialogState({ 
+            mode: 'add', 
+            voter: null, 
+            coords: newCoords
         });
-        setZoom(12);
       },
       () => {
-        // Handle error or user denial. Default center is already set.
-        console.info("Could not get user location, defaulting to center.");
+        toast({
+          variant: "destructive",
+          title: "Location Error",
+          description: "Could not get your location. Please enable location services and grant permission.",
+        });
       }
     );
-  }, []);
+  }, [toast]);
+
+  useEffect(() => {
+    if (searchParams.get('add') === 'true') {
+        openAddDialogAtCurrentLocation();
+    } else {
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                setCenter({
+                lat: position.coords.latitude,
+                lng: position.coords.longitude,
+                });
+                setZoom(12);
+            },
+            () => {
+                console.info("Could not get user location, defaulting to center.");
+            }
+        );
+    }
+  }, [searchParams, openAddDialogAtCurrentLocation]);
   
   const handleDialogClose = () => setDialogState(null);
 
@@ -72,28 +102,7 @@ export default function MapContainer({ initialVoters, apiKey }: MapContainerProp
   };
 
   const handleAddClick = () => {
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const newCoords = {
-          lat: position.coords.latitude,
-          lng: position.coords.longitude,
-        };
-        setCenter(newCoords);
-        setZoom(15);
-        setDialogState({ 
-            mode: 'add', 
-            voter: null, 
-            coords: newCoords
-        });
-      },
-      () => {
-        toast({
-          variant: "destructive",
-          title: "Location Error",
-          description: "Could not get your location. Please enable location services and grant permission.",
-        });
-      }
-    );
+    openAddDialogAtCurrentLocation();
   };
   
   const handleDelete = async (voterId: string) => {
@@ -120,10 +129,13 @@ export default function MapContainer({ initialVoters, apiKey }: MapContainerProp
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2"><User /> Voter Information</DialogTitle>
                 </DialogHeader>
-                <div className="space-y-4 py-4">
+                <div className="space-y-4 py-4 text-sm">
                     <p><strong>Name:</strong> {voter.name}</p>
                     <p><strong>Age:</strong> {voter.age}</p>
                     <p><strong>Party:</strong> <Badge style={{ backgroundColor: PARTY_COLORS[voter.party], color: voter.party === 'White' || voter.party === 'Yellow' ? '#000' : '#fff' }}>{voter.party}</Badge></p>
+                    <p><strong>Address:</strong> {voter.address}</p>
+                    <p><strong># in House:</strong> {voter.peopleInHouse}</p>
+                    <p><strong>Designation:</strong> {voter.designation}</p>
                     <p><strong>Notes:</strong> {voter.notes || 'N/A'}</p>
                 </div>
                 <div className="flex justify-end gap-2">
@@ -157,7 +169,7 @@ export default function MapContainer({ initialVoters, apiKey }: MapContainerProp
 
     if(mode === 'add' || mode === 'edit') {
         return (
-            <DialogContent>
+            <DialogContent className="max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle>{mode === 'add' ? 'Add New Voter' : 'Edit Voter'}</DialogTitle>
                     <DialogDescription>
@@ -167,7 +179,14 @@ export default function MapContainer({ initialVoters, apiKey }: MapContainerProp
                 <VoterForm 
                     voter={voter} 
                     coords={dialogState.coords} 
-                    onSuccess={(updatedVoter) => handleFormSuccess(updatedVoter, mode)}
+                    onSuccess={(updatedVoter, mode) => {
+                        handleFormSuccess(updatedVoter, mode);
+                        // Center map on new voter
+                        if (mode === 'add') {
+                            setCenter({ lat: updatedVoter.lat, lng: updatedVoter.lng });
+                            setZoom(15);
+                        }
+                    }}
                     onCancel={handleDialogClose}
                 />
             </DialogContent>
@@ -178,7 +197,7 @@ export default function MapContainer({ initialVoters, apiKey }: MapContainerProp
   }
 
   return (
-    <div className="w-full h-full">
+    <div className="w-full h-full relative">
       <APIProvider apiKey={apiKey}>
         <Map
           mapId={"votemapper-map"}
@@ -224,4 +243,13 @@ export default function MapContainer({ initialVoters, apiKey }: MapContainerProp
       </Dialog>
     </div>
   );
+}
+
+
+export default function MapContainer(props: MapContainerProps) {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center h-full"><Loader2 className="h-10 w-10 animate-spin" /></div>}>
+      <MapContent {...props} />
+    </Suspense>
+  )
 }

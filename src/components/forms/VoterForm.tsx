@@ -20,6 +20,9 @@ const formSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters.").max(50),
   age: z.coerce.number().int().min(18, "Voter must be 18 or older.").max(120),
   party: z.enum(parties),
+  address: z.string().min(5, "Address must be at least 5 characters.").max(100),
+  peopleInHouse: z.coerce.number().int().min(1, "Must be at least 1 person.").max(20),
+  designation: z.string().min(2, "Designation must be at least 2 characters.").max(50),
   notes: z.string().max(500, "Notes must be 500 characters or less.").optional(),
   lat: z.coerce.number(),
   lng: z.coerce.number(),
@@ -45,6 +48,9 @@ export default function VoterForm({ voter, coords, onSuccess, onCancel }: VoterF
       name: voter?.name ?? "",
       age: voter?.age ?? 18,
       party: voter?.party,
+      address: voter?.address ?? "",
+      peopleInHouse: voter?.peopleInHouse ?? 1,
+      designation: voter?.designation ?? "",
       notes: voter?.notes ?? "",
       lat: voter?.lat ?? coords?.lat,
       lng: voter?.lng ?? coords?.lng,
@@ -84,7 +90,7 @@ export default function VoterForm({ voter, coords, onSuccess, onCancel }: VoterF
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
         <FormField
           control={form.control}
           name="name"
@@ -98,6 +104,21 @@ export default function VoterForm({ voter, coords, onSuccess, onCancel }: VoterF
             </FormItem>
           )}
         />
+        
+        <FormField
+          control={form.control}
+          name="address"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Address</FormLabel>
+              <FormControl>
+                <Input placeholder="123 Main St, Anytown, USA" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
         <div className="grid grid-cols-2 gap-4">
           <FormField
             control={form.control}
@@ -137,6 +158,36 @@ export default function VoterForm({ voter, coords, onSuccess, onCancel }: VoterF
             )}
           />
         </div>
+        
+        <div className="grid grid-cols-2 gap-4">
+            <FormField
+                control={form.control}
+                name="peopleInHouse"
+                render={({ field }) => (
+                <FormItem>
+                    <FormLabel># People in House</FormLabel>
+                    <FormControl>
+                    <Input type="number" placeholder="2" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                </FormItem>
+                )}
+            />
+            <FormField
+                control={form.control}
+                name="designation"
+                render={({ field }) => (
+                <FormItem>
+                    <FormLabel>Designation</FormLabel>
+                    <FormControl>
+                    <Input placeholder="e.g., Engineer, Doctor" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                </FormItem>
+                )}
+            />
+        </div>
+
          <div className="grid grid-cols-2 gap-4">
           <FormField
             control={form.control}
@@ -178,7 +229,7 @@ export default function VoterForm({ voter, coords, onSuccess, onCancel }: VoterF
             </FormItem>
           )}
         />
-        <div className="flex justify-end gap-2">
+        <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="ghost" onClick={onCancel} disabled={isLoading}>
                 Cancel
             </Button>

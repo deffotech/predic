@@ -53,8 +53,8 @@ export default function DashboardClient({ initialVoters }: DashboardClientProps)
   }, []);
 
   const handleExport = () => {
-    const headers = ['ID', 'Name', 'Age', 'Party', 'Latitude', 'Longitude', 'Notes', 'Date Added'];
-    const rows = voters.map(v => [v.id, v.name, v.age, v.party, v.lat, v.lng, v.notes?.replace(/"/g, '""') || '', v.createdAt].join(','));
+    const headers = ['ID', 'Name', 'Age', 'Party', 'Address', '# People', 'Designation', 'Latitude', 'Longitude', 'Notes', 'Date Added'];
+    const rows = voters.map(v => [v.id, v.name, v.age, v.party, `"${v.address}"`, v.peopleInHouse, v.designation, v.lat, v.lng, v.notes?.replace(/"/g, '""') || '', v.createdAt].join(','));
     const csvContent = "data:text/csv;charset=utf-8," + [headers.join(','), ...rows].join('\n');
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
@@ -139,24 +139,24 @@ export default function DashboardClient({ initialVoters }: DashboardClientProps)
               <TableHeader>
                 <TableRow>
                   <TableHead>Name</TableHead>
-                  <TableHead>Age</TableHead>
                   <TableHead>Party</TableHead>
-                  <TableHead>Date Added</TableHead>
-                  <TableHead className="text-right">Location (Lat, Lng)</TableHead>
+                  <TableHead>Address</TableHead>
+                  <TableHead>Designation</TableHead>
+                  <TableHead className="text-right">Date Added</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {voters.length > 0 ? voters.map((voter) => (
                   <TableRow key={voter.id}>
                     <TableCell className="font-medium">{voter.name}</TableCell>
-                    <TableCell>{voter.age}</TableCell>
                     <TableCell>
                       <Badge style={{ backgroundColor: PARTY_COLORS[voter.party], color: voter.party === 'White' || voter.party === 'Yellow' ? '#000' : '#fff' }}>
                         {voter.party}
                       </Badge>
                     </TableCell>
-                    <TableCell>{format(new Date(voter.createdAt), 'PP')}</TableCell>
-                    <TableCell className="text-right font-mono text-xs">{voter.lat.toFixed(4)}, {voter.lng.toFixed(4)}</TableCell>
+                    <TableCell>{voter.address}</TableCell>
+                    <TableCell>{voter.designation}</TableCell>
+                    <TableCell className="text-right">{format(new Date(voter.createdAt), 'PP')}</TableCell>
                   </TableRow>
                 )) : (
                     <TableRow>

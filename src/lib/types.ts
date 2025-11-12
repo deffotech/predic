@@ -8,6 +8,9 @@ export type Voter = {
   name: string;
   age: number;
   party: Party;
+  address: string;
+  peopleInHouse: number;
+  designation: string;
   notes?: string;
   lat: number;
   lng: number;

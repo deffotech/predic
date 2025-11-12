@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { AppName } from "@/lib/constants";
-import { ArrowRight, LayoutDashboard, Map } from "lucide-react";
+import { ArrowRight, LayoutDashboard, Map, PlusCircle } from "lucide-react";
 import Link from "next/link";
 
 export default function Home() {
@@ -31,6 +31,12 @@ export default function Home() {
               <Map className="mr-2" />
               Enter The Map
               <ArrowRight className="ml-2 transition-transform group-hover:translate-x-1" />
+            </Link>
+          </Button>
+           <Button asChild size="lg" variant="outline" className="w-full sm:w-auto">
+            <Link href="/map?add=true">
+              <PlusCircle className="mr-2" />
+              Add Details
             </Link>
           </Button>
           <Button asChild size="lg" variant="secondary" className="w-full sm:w-auto">
