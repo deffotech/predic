@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from "next/link";
@@ -8,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { LayoutDashboard, Map, Menu, Vote } from "lucide-react";
 import { useState } from "react";
+import ThemeToggle from "@/components/ThemeToggle";
 
 const navLinks = [
   { href: "/map", label: "Map", icon: Map },
@@ -76,7 +78,7 @@ export default function Header() {
         </div>
 
         <div className="flex flex-1 items-center justify-between space-x-2 md:justify-end">
-          {/* Future elements like user profile can go here */}
+          <ThemeToggle />
         </div>
       </div>
     </header>
