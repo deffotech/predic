@@ -33,11 +33,12 @@ type DialogState = {
 } | null;
 
 function DraggableNewVoterMarker({ position, onDragEnd }: { position: { lat: number; lng: number }, onDragEnd: (coords: { lat: number; lng: number }) => void }) {
-    const [marker, setMarker] = useState<google.maps.marker.AdvancedMarkerElement | null>(null);
     const map = useMap();
+    const [marker, setMarker] = useState<google.maps.marker.AdvancedMarkerElement | null>(null);
 
     useEffect(() => {
         if (!map) return;
+        
         const newMarker = new google.maps.marker.AdvancedMarkerElement({
             map,
             position,
@@ -45,21 +46,29 @@ function DraggableNewVoterMarker({ position, onDragEnd }: { position: { lat: num
         });
 
         setMarker(newMarker);
-
+        
         return () => {
             newMarker.map = null;
         };
-    }, [map, position]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [map]); // Position is intentionally omitted to prevent re-creating the marker on drag
 
     useEffect(() => {
         if (!marker) return;
+
+        marker.position = position;
+
         const listener = marker.addListener('dragend', () => {
-            onDragEnd(marker.position as { lat: number; lng: number });
+            const newPosition = marker.position;
+            if (newPosition) {
+                onDragEnd({ lat: newPosition.lat, lng: newPosition.lng });
+            }
         });
+
         return () => {
             google.maps.event.removeListener(listener);
-        }
-    }, [marker, onDragEnd]);
+        };
+    }, [marker, position, onDragEnd]);
 
     return null;
 }
@@ -200,12 +209,12 @@ function MapContent({ initialVoters, apiKey }: MapContainerProps) {
     }
   }, [map]);
 
-  const handleMarkerDragEnd = async (coords: { lat: number; lng: number }) => {
-    if (dialogState && dialogState.mode === 'add') {
+  const handleMarkerDragEnd = useCallback(async (coords: { lat: number; lng: number }) => {
+    if (dialogState && (dialogState.mode === 'add' || dialogState.mode === 'edit')) {
       const address = await getAddressFromCoords(coords);
       setDialogState({ ...dialogState, coords, address });
     }
-  }
+  }, [dialogState, getAddressFromCoords]);
 
 
   const renderDialogContent = () => {
@@ -282,7 +291,7 @@ function MapContent({ initialVoters, apiKey }: MapContainerProps) {
 
   return (
     <div className="w-full h-full relative">
-      <APIProvider apiKey={apiKey} libraries={['places', 'geocoding']}>
+      <APIProvider apiKey={apiKey} libraries={['places', 'geocoding', 'marker']}>
         <MapSearch onPlaceSelect={onPlaceSelect} />
         <Map
           ref={setMap}
@@ -306,7 +315,7 @@ function MapContent({ initialVoters, apiKey }: MapContainerProps) {
               <MapPin style={{ color: PARTY_COLORS[voter.party], fill: PARTY_COLORS[voter.party] }} size={36} />
             </AdvancedMarker>
           ))}
-          {dialogState?.mode === 'add' && dialogState.coords && (
+          {(dialogState?.mode === 'add' || dialogState?.mode === 'edit') && dialogState.coords && (
              <DraggableNewVoterMarker position={dialogState.coords} onDragEnd={handleMarkerDragEnd} />
           )}
         </Map>
@@ -343,5 +352,3 @@ export default function MapContainer(props: MapContainerProps) {
     </Suspense>
   )
 }
-
-    
