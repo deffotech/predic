@@ -1,6 +1,7 @@
+
 import { Button } from "@/components/ui/button";
 import { AppName } from "@/lib/constants";
-import { ArrowRight, LayoutDashboard, Map, PlusCircle } from "lucide-react";
+import { ArrowRight, LayoutDashboard, Map, MapPin, PlusCircle } from "lucide-react";
 import Link from "next/link";
 
 export default function Home() {
@@ -37,6 +38,12 @@ export default function Home() {
             <Link href="/map?add=true">
               <PlusCircle className="mr-2" />
               Add Details
+            </Link>
+          </Button>
+          <Button asChild size="lg" variant="outline" className="w-full sm:w-auto">
+            <Link href="/map">
+              <MapPin className="mr-2" />
+              Place a Marker
             </Link>
           </Button>
           <Button asChild size="lg" variant="secondary" className="w-full sm:w-auto">
