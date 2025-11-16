@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useCallback, Suspense, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
-import { APIProvider, Map, AdvancedMarker } from "@vis.gl/react-google-maps";
+import { APIProvider, Map, AdvancedMarker, useMap, useMapsLibrary } from "@vis.gl/react-google-maps";
 import type { Voter } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { MapPin, Plus, Loader2, X, Trash2, Pencil, User, MapPinPlus, Info } from "lucide-react";
@@ -29,7 +29,41 @@ type DialogState = {
   mode: 'add' | 'edit' | 'view';
   voter: Voter | null;
   coords?: { lat: number; lng: number };
+  address?: string;
 } | null;
+
+function DraggableNewVoterMarker({ position, onDragEnd }: { position: { lat: number; lng: number }, onDragEnd: (coords: { lat: number; lng: number }) => void }) {
+    const [marker, setMarker] = useState<google.maps.marker.AdvancedMarkerElement | null>(null);
+    const map = useMap();
+
+    useEffect(() => {
+        if (!map) return;
+        const newMarker = new google.maps.marker.AdvancedMarkerElement({
+            map,
+            position,
+            gmpDraggable: true,
+        });
+
+        setMarker(newMarker);
+
+        return () => {
+            newMarker.map = null;
+        };
+    }, [map, position]);
+
+    useEffect(() => {
+        if (!marker) return;
+        const listener = marker.addListener('dragend', () => {
+            onDragEnd(marker.position as { lat: number; lng: number });
+        });
+        return () => {
+            google.maps.event.removeListener(listener);
+        }
+    }, [marker, onDragEnd]);
+
+    return null;
+}
+
 
 function MapContent({ initialVoters, apiKey }: MapContainerProps) {
   const firestore = useFirestore();
@@ -43,20 +77,44 @@ function MapContent({ initialVoters, apiKey }: MapContainerProps) {
   const [isDeleting, setIsDeleting] = useState(false);
   const { toast } = useToast();
   const searchParams = useSearchParams();
+  const geocoding = useMapsLibrary('geocoding');
+  const [geocoder, setGeocoder] = useState<google.maps.Geocoder | null>(null);
+
+  useEffect(() => {
+    if (geocoding) {
+      setGeocoder(new geocoding.Geocoder());
+    }
+  }, [geocoding]);
+
+  const getAddressFromCoords = useCallback(async (coords: { lat: number; lng: number }) => {
+    if (!geocoder) return "Address not found";
+    try {
+        const response = await geocoder.geocode({ location: coords });
+        if (response.results[0]) {
+            return response.results[0].formatted_address;
+        }
+        return "No address found for these coordinates."
+    } catch (e) {
+        console.error("Geocoding failed", e);
+        return "Could not fetch address.";
+    }
+  }, [geocoder]);
 
   const openAddDialogAtCurrentLocation = useCallback(() => {
     navigator.geolocation.getCurrentPosition(
-      (position) => {
+      async (position) => {
         const newCoords = {
           lat: position.coords.latitude,
           lng: position.coords.longitude,
         };
+        const address = await getAddressFromCoords(newCoords);
         setCenter(newCoords);
         setZoom(15);
         setDialogState({ 
             mode: 'add', 
             voter: null, 
-            coords: newCoords
+            coords: newCoords,
+            address: address
         });
       },
       () => {
@@ -67,7 +125,7 @@ function MapContent({ initialVoters, apiKey }: MapContainerProps) {
         });
       }
     );
-  }, [toast]);
+  }, [toast, getAddressFromCoords]);
 
   useEffect(() => {
     if (searchParams.get('add') === 'true') {
@@ -91,7 +149,6 @@ function MapContent({ initialVoters, apiKey }: MapContainerProps) {
   const handleDialogClose = () => setDialogState(null);
 
   const handleFormSuccess = (updatedVoter: Voter, mode: 'add' | 'edit') => {
-    // No need to update local state, useCollection handles it
     handleDialogClose();
     if (mode === 'add') {
       setCenter({ lat: updatedVoter.lat, lng: updatedVoter.lng });
@@ -99,16 +156,19 @@ function MapContent({ initialVoters, apiKey }: MapContainerProps) {
     }
   };
   
-  const handleMapClick = (ev: google.maps.MapMouseEvent) => {
+  const handleMapClick = async (ev: google.maps.MapMouseEvent) => {
     if (ev.latLng) {
+      const coords = ev.latLng.toJSON();
+      const address = await getAddressFromCoords(coords);
       setDialogState({ 
         mode: 'add', 
         voter: null, 
-        coords: ev.latLng.toJSON() 
+        coords: coords,
+        address: address,
       });
     }
   };
-
+  
   const handleAddClick = () => {
     openAddDialogAtCurrentLocation();
   };
@@ -125,12 +185,28 @@ function MapContent({ initialVoters, apiKey }: MapContainerProps) {
     setIsDeleting(false);
   };
 
-  const onPlaceSelect = useCallback((place: google.maps.places.PlaceResult) => {
+  const onPlaceSelect = useCallback(async (place: google.maps.places.PlaceResult) => {
     if (place.geometry && place.geometry.location) {
-      map?.panTo(place.geometry.location);
+      const coords = place.geometry.location.toJSON();
+      map?.panTo(coords);
       map?.setZoom(15);
+      
+      setDialogState({
+        mode: 'add',
+        voter: null,
+        coords,
+        address: place.formatted_address
+      });
     }
   }, [map]);
+
+  const handleMarkerDragEnd = async (coords: { lat: number; lng: number }) => {
+    if (dialogState && dialogState.mode === 'add') {
+      const address = await getAddressFromCoords(coords);
+      setDialogState({ ...dialogState, coords, address });
+    }
+  }
+
 
   const renderDialogContent = () => {
     if (!dialogState) return null;
@@ -187,12 +263,13 @@ function MapContent({ initialVoters, apiKey }: MapContainerProps) {
                 <DialogHeader>
                     <DialogTitle>{mode === 'add' ? 'Add New Voter' : 'Edit Voter'}</DialogTitle>
                     <DialogDescription>
-                        {mode === 'add' ? 'Enter the details for the new voter at the selected location.' : 'Update the voter\'s information.'}
+                        {mode === 'add' ? 'Enter the details for the new voter. You can drag the marker on the map to adjust the location.' : 'Update the voter\'s information.'}
                     </DialogDescription>
                 </DialogHeader>
                 <VoterForm 
                     voter={voter} 
-                    coords={dialogState.coords} 
+                    coords={dialogState.coords}
+                    address={dialogState.address}
                     onSuccess={handleFormSuccess}
                     onCancel={handleDialogClose}
                 />
@@ -205,7 +282,7 @@ function MapContent({ initialVoters, apiKey }: MapContainerProps) {
 
   return (
     <div className="w-full h-full relative">
-      <APIProvider apiKey={apiKey}>
+      <APIProvider apiKey={apiKey} libraries={['places', 'geocoding']}>
         <MapSearch onPlaceSelect={onPlaceSelect} />
         <Map
           ref={setMap}
@@ -229,6 +306,9 @@ function MapContent({ initialVoters, apiKey }: MapContainerProps) {
               <MapPin style={{ color: PARTY_COLORS[voter.party], fill: PARTY_COLORS[voter.party] }} size={36} />
             </AdvancedMarker>
           ))}
+          {dialogState?.mode === 'add' && dialogState.coords && (
+             <DraggableNewVoterMarker position={dialogState.coords} onDragEnd={handleMarkerDragEnd} />
+          )}
         </Map>
       </APIProvider>
        <TooltipProvider>
@@ -263,3 +343,5 @@ export default function MapContainer(props: MapContainerProps) {
     </Suspense>
   )
 }
+
+    

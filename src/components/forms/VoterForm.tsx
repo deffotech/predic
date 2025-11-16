@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,7 @@ import type { Voter } from "@/lib/types";
 import { parties } from "@/lib/types";
 import { addVoter, updateVoter } from "@/lib/actions";
 import { useToast } from "@/hooks/use-toast";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 
 const formSchema = z.object({
@@ -33,11 +33,12 @@ type VoterFormValues = z.infer<typeof formSchema>;
 type VoterFormProps = {
   voter?: Voter | null;
   coords?: { lat: number; lng: number };
+  address?: string;
   onSuccess: (voter: Voter, mode: 'add' | 'edit') => void;
   onCancel: () => void;
 };
 
-export default function VoterForm({ voter, coords, onSuccess, onCancel }: VoterFormProps) {
+export default function VoterForm({ voter, coords, address, onSuccess, onCancel }: VoterFormProps) {
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
   const mode = voter ? 'edit' : 'add';
@@ -48,7 +49,7 @@ export default function VoterForm({ voter, coords, onSuccess, onCancel }: VoterF
       name: voter?.name ?? "",
       age: voter?.age,
       party: voter?.party,
-      address: voter?.address ?? "",
+      address: voter?.address ?? address ?? "",
       peopleInHouse: voter?.peopleInHouse,
       designation: voter?.designation ?? "",
       notes: voter?.notes ?? "",
@@ -57,12 +58,27 @@ export default function VoterForm({ voter, coords, onSuccess, onCancel }: VoterF
     },
   });
 
+  // Watch for external changes to coords and address
+  useEffect(() => {
+    if (coords) {
+      form.setValue('lat', coords.lat);
+      form.setValue('lng', coords.lng);
+    }
+  }, [coords, form]);
+
+  useEffect(() => {
+    if (address) {
+      form.setValue('address', address);
+    }
+  }, [address, form]);
+
+
   async function onSubmit(data: VoterFormValues) {
     setIsLoading(true);
     try {
       const submissionData = {
         name: data.name || "Unnamed",
-        party: data.party || "White", // Default party if not selected
+        party: data.party || "White",
         lat: data.lat,
         lng: data.lng,
         age: data.age,
@@ -254,3 +270,5 @@ export default function VoterForm({ voter, coords, onSuccess, onCancel }: VoterF
     </Form>
   );
 }
+
+    

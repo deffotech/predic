@@ -20,11 +20,15 @@ export default function MapSearch({ onPlaceSelect }: MapSearchProps) {
     if (!places || !inputRef.current) return;
 
     const autocomplete = new places.Autocomplete(inputRef.current, {
-        fields: ["geometry", "name"],
+        fields: ["geometry", "name", "formatted_address"],
     });
 
     autocomplete.addListener("place_changed", () => {
-      onPlaceSelect(autocomplete.getPlace());
+      const place = autocomplete.getPlace();
+      onPlaceSelect(place);
+      if(inputRef.current) {
+        inputRef.current.value = "";
+      }
     });
 
     setPlaceAutocomplete(autocomplete);
@@ -44,3 +48,5 @@ export default function MapSearch({ onPlaceSelect }: MapSearchProps) {
     </div>
   );
 }
+
+    
