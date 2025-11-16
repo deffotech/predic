@@ -12,13 +12,25 @@ import {
   serverTimestamp,
   getDoc,
 } from 'firebase/firestore';
-import { initializeFirebase } from '@/firebase';
+import { initializeApp, getApps, getApp } from 'firebase/app';
+import { getFirestore } from 'firebase/firestore';
+import { firebaseConfig } from '@/firebase/config';
 import type { NewVoter, UpdatableVoter, Voter } from './types';
 
 // This function now uses a server-side initialized Firebase instance
 async function getFirestoreInstance() {
-  const { firestore } = initializeFirebase();
-  return firestore;
+  if (!getApps().length) {
+    try {
+      // In a server environment, we can directly initialize with the config.
+      const app = initializeApp(firebaseConfig);
+      return getFirestore(app);
+    } catch (e) {
+      console.error("Failed to initialize Firebase on the server.", e);
+      // If it's already initialized by another server action, get the existing instance.
+      return getFirestore(getApp());
+    }
+  }
+  return getFirestore(getApp());
 }
 
 export async function getVoters(): Promise<Voter[]> {
