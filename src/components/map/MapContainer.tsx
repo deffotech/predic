@@ -34,41 +34,47 @@ type DialogState = {
 
 function DraggableNewVoterMarker({ position, onDragEnd }: { position: { lat: number; lng: number }, onDragEnd: (coords: { lat: number; lng: number }) => void }) {
     const map = useMap();
+    const markerLib = useMapsLibrary('marker');
     const [marker, setMarker] = useState<google.maps.marker.AdvancedMarkerElement | null>(null);
 
     useEffect(() => {
-        if (!map) return;
-        
-        const newMarker = new google.maps.marker.AdvancedMarkerElement({
-            map,
-            position,
-            gmpDraggable: true,
-        });
+        if (!map || !markerLib) {
+            return;
+        }
 
-        setMarker(newMarker);
+        if (!marker) {
+            const newMarker = new markerLib.AdvancedMarkerElement({
+                map,
+                position,
+                gmpDraggable: true,
+            });
+            setMarker(newMarker);
+        } else {
+            marker.position = position;
+        }
         
-        return () => {
-            newMarker.map = null;
-        };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [map]); // Position is intentionally omitted to prevent re-creating the marker on drag
+    }, [map, markerLib, marker, position]);
 
     useEffect(() => {
         if (!marker) return;
 
-        marker.position = position;
-
         const listener = marker.addListener('dragend', () => {
             const newPosition = marker.position;
             if (newPosition) {
-                onDragEnd({ lat: newPosition.lat, lng: newPosition.lng });
+                 if (typeof newPosition.lat === 'function' && typeof newPosition.lng === 'function') {
+                    onDragEnd({ lat: newPosition.lat(), lng: newPosition.lng() });
+                }
             }
         });
 
+        // Cleanup function to remove marker from map and event listener
         return () => {
             google.maps.event.removeListener(listener);
+            if (marker) {
+                marker.map = null;
+            }
         };
-    }, [marker, position, onDragEnd]);
+    }, [marker, onDragEnd]);
 
     return null;
 }
