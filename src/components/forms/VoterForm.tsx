@@ -17,13 +17,13 @@ import { useState } from "react";
 import { Loader2 } from "lucide-react";
 
 const formSchema = z.object({
-  name: z.string().min(2, "Name must be at least 2 characters.").max(50),
-  age: z.coerce.number().int().min(18, "Voter must be 18 or older.").max(120),
-  party: z.enum(parties),
-  address: z.string().min(5, "Address must be at least 5 characters.").max(100),
-  peopleInHouse: z.coerce.number().int().min(1, "Must be at least 1 person.").max(20),
-  designation: z.string().min(2, "Designation must be at least 2 characters.").max(50),
-  notes: z.string().max(500, "Notes must be 500 characters or less.").optional(),
+  name: z.string().optional(),
+  age: z.coerce.number().optional(),
+  party: z.enum(parties).optional(),
+  address: z.string().optional(),
+  peopleInHouse: z.coerce.number().optional(),
+  designation: z.string().optional(),
+  notes: z.string().optional(),
   lat: z.coerce.number(),
   lng: z.coerce.number(),
 });
@@ -46,10 +46,10 @@ export default function VoterForm({ voter, coords, onSuccess, onCancel }: VoterF
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: voter?.name ?? "",
-      age: voter?.age ?? 18,
+      age: voter?.age,
       party: voter?.party,
       address: voter?.address ?? "",
-      peopleInHouse: voter?.peopleInHouse ?? 1,
+      peopleInHouse: voter?.peopleInHouse,
       designation: voter?.designation ?? "",
       notes: voter?.notes ?? "",
       lat: voter?.lat ?? coords?.lat,
@@ -60,8 +60,20 @@ export default function VoterForm({ voter, coords, onSuccess, onCancel }: VoterF
   async function onSubmit(data: VoterFormValues) {
     setIsLoading(true);
     try {
+      const submissionData = {
+        name: data.name || "Unnamed",
+        party: data.party || "White", // Default party if not selected
+        lat: data.lat,
+        lng: data.lng,
+        age: data.age,
+        address: data.address,
+        peopleInHouse: data.peopleInHouse,
+        designation: data.designation,
+        notes: data.notes
+      };
+
       if (mode === 'add') {
-        const result = await addVoter(data);
+        const result = await addVoter(submissionData);
         if (result.success && result.voter) {
           toast({ title: "Success", description: "Voter added successfully." });
           onSuccess(result.voter, 'add');
@@ -69,7 +81,7 @@ export default function VoterForm({ voter, coords, onSuccess, onCancel }: VoterF
           throw new Error("Failed to add voter.");
         }
       } else if (voter) {
-        const result = await updateVoter(voter.id, data);
+        const result = await updateVoter(voter.id, submissionData);
         if (result.success && result.voter) {
           toast({ title: "Success", description: "Voter updated successfully." });
           onSuccess(result.voter, 'edit');

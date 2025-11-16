@@ -18,6 +18,7 @@ import { Badge } from "../ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui/tooltip";
 import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
 import { collection } from "firebase/firestore";
+import MapSearch from "./MapSearch";
 
 type MapContainerProps = {
   initialVoters: Voter[];
@@ -35,6 +36,7 @@ function MapContent({ initialVoters, apiKey }: MapContainerProps) {
   const votersQuery = useMemoFirebase(() => firestore && collection(firestore, 'voters'), [firestore]);
   const { data: voters, isLoading: isLoadingVoters } = useCollection<Voter>(votersQuery);
 
+  const [map, setMap] = useState<google.maps.Map | null>(null);
   const [center, setCenter] = useState({ lat: 20.5937, lng: 78.9629 }); // Default to India
   const [zoom, setZoom] = useState(5);
   const [dialogState, setDialogState] = useState<DialogState>(null);
@@ -91,6 +93,10 @@ function MapContent({ initialVoters, apiKey }: MapContainerProps) {
   const handleFormSuccess = (updatedVoter: Voter, mode: 'add' | 'edit') => {
     // No need to update local state, useCollection handles it
     handleDialogClose();
+    if (mode === 'add') {
+      setCenter({ lat: updatedVoter.lat, lng: updatedVoter.lng });
+      setZoom(15);
+    }
   };
   
   const handleMapClick = (ev: google.maps.MapMouseEvent) => {
@@ -118,6 +124,13 @@ function MapContent({ initialVoters, apiKey }: MapContainerProps) {
     }
     setIsDeleting(false);
   };
+
+  const onPlaceSelect = useCallback((place: google.maps.places.PlaceResult) => {
+    if (place.geometry && place.geometry.location) {
+      map?.panTo(place.geometry.location);
+      map?.setZoom(15);
+    }
+  }, [map]);
 
   const renderDialogContent = () => {
     if (!dialogState) return null;
@@ -180,14 +193,7 @@ function MapContent({ initialVoters, apiKey }: MapContainerProps) {
                 <VoterForm 
                     voter={voter} 
                     coords={dialogState.coords} 
-                    onSuccess={(updatedVoter, mode) => {
-                        handleFormSuccess(updatedVoter, mode);
-                        // Center map on new voter
-                        if (mode === 'add') {
-                            setCenter({ lat: updatedVoter.lat, lng: updatedVoter.lng });
-                            setZoom(15);
-                        }
-                    }}
+                    onSuccess={handleFormSuccess}
                     onCancel={handleDialogClose}
                 />
             </DialogContent>
@@ -200,7 +206,9 @@ function MapContent({ initialVoters, apiKey }: MapContainerProps) {
   return (
     <div className="w-full h-full relative">
       <APIProvider apiKey={apiKey}>
+        <MapSearch onPlaceSelect={onPlaceSelect} />
         <Map
+          ref={setMap}
           mapId={"votemapper-map"}
           center={center}
           zoom={zoom}
