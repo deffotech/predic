@@ -1,360 +1,290 @@
-
 "use client";
 
-import { useState, useEffect, useCallback, Suspense, useMemo } from "react";
+import { useState, useEffect, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { APIProvider, Map, AdvancedMarker, useMap, useMapsLibrary } from "@vis.gl/react-google-maps";
-import type { Voter } from "@/lib/types";
+
+import {
+  APIProvider,
+  Map,
+  AdvancedMarker,
+  useMap,
+  useMapsLibrary
+} from "@vis.gl/react-google-maps";
+
 import { Button } from "@/components/ui/button";
-import { MapPin, Plus, Loader2, X, Trash2, Pencil, User, MapPinPlus, Info } from "lucide-react";
-import { PARTY_COLORS } from "@/lib/constants";
-import VoterForm from "@/components/forms/VoterForm";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { useToast } from "@/hooks/use-toast";
-import { deleteVoter } from "@/lib/actions";
-import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
-import { Badge } from "../ui/badge";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui/tooltip";
-import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
-import { collection } from "firebase/firestore";
+import { MapPin, Loader2, MapPinPlus, Pencil, Trash2, User } from "lucide-react";
+
+import { PARTY_COLORS, DEFAULT_PARTY_COLOR } from "@/lib/constants";
+
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
+import { TooltipProvider, Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+
 import MapSearch from "./MapSearch";
 
-type MapContainerProps = {
-  initialVoters: Voter[];
-  apiKey: string;
+/* ---------------------------------------------------------
+   FRONTEND-ONLY MODE — NO BACKEND
+--------------------------------------------------------- */
+
+type Party = keyof typeof PARTY_COLORS;
+
+type Voter = {
+  id: string;
+  name: string;
+  lat: number;
+  lng: number;
+  age: number;
+  party: Party;
+  address: string;
+  peopleInHouse: number;
+  designation: string;
+  notes?: string;
 };
 
+const DUMMY_VOTERS: Voter[] = [
+  {
+    id: "1",
+    name: "Ravi Kumar",
+    lat: 12.9716,
+    lng: 77.5946,
+    age: 40,
+    party: "Saffron",
+    address: "Bangalore, MG Road",
+    peopleInHouse: 4,
+    designation: "Engineer",
+    notes: "Supportive"
+  },
+  {
+    id: "2",
+    name: "Anjali Singh",
+    lat: 19.076,
+    lng: 72.8777,
+    age: 32,
+    party: "Red",
+    address: "Mumbai, Andheri",
+    peopleInHouse: 3,
+    designation: "Teacher"
+  }
+];
+
+type MapContainerProps = { apiKey: string };
+
 type DialogState = {
-  mode: 'add' | 'edit' | 'view';
+  mode: "add" | "edit" | "view";
   voter: Voter | null;
   coords?: { lat: number; lng: number };
   address?: string;
 } | null;
 
-function DraggableNewVoterMarker({ position, onDragEnd }: { position: { lat: number; lng: number }, onDragEnd: (coords: { lat: number; lng: number }) => void }) {
-    const map = useMap();
-    const markerLib = useMapsLibrary('marker');
-    const [marker, setMarker] = useState<google.maps.marker.AdvancedMarkerElement | null>(null);
+/* ---------------------------------------------------------
+   MAIN CONTENT
+--------------------------------------------------------- */
 
-    useEffect(() => {
-        if (!map || !markerLib) {
-            return;
-        }
-
-        if (!marker) {
-            const newMarker = new markerLib.AdvancedMarkerElement({
-                map,
-                position,
-                gmpDraggable: true,
-            });
-            setMarker(newMarker);
-        } else {
-            marker.position = position;
-        }
-        
-    }, [map, markerLib, marker, position]);
-
-    useEffect(() => {
-        if (!marker) return;
-
-        const listener = marker.addListener('dragend', () => {
-            const newPosition = marker.position;
-            if (newPosition) {
-                 if (typeof newPosition.lat === 'function' && typeof newPosition.lng === 'function') {
-                    onDragEnd({ lat: newPosition.lat(), lng: newPosition.lng() });
-                }
-            }
-        });
-
-        // Cleanup function to remove marker from map and event listener
-        return () => {
-            google.maps.event.removeListener(listener);
-            if (marker) {
-                marker.map = null;
-            }
-        };
-    }, [marker, onDragEnd]);
-
-    return null;
-}
-
-
-function MapContent({ initialVoters, apiKey }: MapContainerProps) {
-  const firestore = useFirestore();
-  const votersQuery = useMemoFirebase(() => firestore && collection(firestore, 'voters'), [firestore]);
-  const { data: voters, isLoading: isLoadingVoters } = useCollection<Voter>(votersQuery);
-
-  const [map, setMap] = useState<google.maps.Map | null>(null);
-  const [center, setCenter] = useState({ lat: 20.5937, lng: 78.9629 }); // Default to India
-  const [zoom, setZoom] = useState(5);
-  const [dialogState, setDialogState] = useState<DialogState>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const { toast } = useToast();
+function MapContent() {
+  const map = useMap();
   const searchParams = useSearchParams();
-  const geocoding = useMapsLibrary('geocoding');
+
+  const [voters] = useState<Voter[]>(DUMMY_VOTERS);
+  const [dialogState, setDialogState] = useState<DialogState>(null);
+
+  const [center] = useState({ lat: 20.5937, lng: 78.9629 });
+  const [zoom] = useState(5);
+
+  const geocoding = useMapsLibrary("geocoding");
   const [geocoder, setGeocoder] = useState<google.maps.Geocoder | null>(null);
 
   useEffect(() => {
-    if (geocoding) {
-      setGeocoder(new geocoding.Geocoder());
-    }
+    if (geocoding) setGeocoder(new geocoding.Geocoder());
   }, [geocoding]);
 
-  const getAddressFromCoords = useCallback(async (coords: { lat: number; lng: number }) => {
-    if (!geocoder) return "Address not found";
-    try {
-        const response = await geocoder.geocode({ location: coords });
-        if (response.results[0]) {
-            return response.results[0].formatted_address;
-        }
-        return "No address found for these coordinates."
-    } catch (e) {
-        console.error("Geocoding failed", e);
-        return "Could not fetch address.";
-    }
-  }, [geocoder]);
-
-  const openAddDialogAtCurrentLocation = useCallback(() => {
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const newCoords = {
-          lat: position.coords.latitude,
-          lng: position.coords.longitude,
-        };
-        const address = await getAddressFromCoords(newCoords);
-        setCenter(newCoords);
-        setZoom(15);
-        setDialogState({ 
-            mode: 'add', 
-            voter: null, 
-            coords: newCoords,
-            address: address
-        });
-      },
-      () => {
-        toast({
-          variant: "destructive",
-          title: "Location Error",
-          description: "Could not get your location. Please enable location services and grant permission.",
-        });
+  const getAddressFromCoords = useCallback(
+    async (coords: { lat: number; lng: number }) => {
+      if (!geocoder) return "Unknown address";
+      try {
+        const res = await geocoder.geocode({ location: coords });
+        return res.results?.[0]?.formatted_address || "Unknown";
+      } catch {
+        return "Unknown address";
       }
-    );
-  }, [toast, getAddressFromCoords]);
+    },
+    [geocoder]
+  );
 
-  useEffect(() => {
-    if (searchParams.get('add') === 'true') {
-        openAddDialogAtCurrentLocation();
-    } else {
-        navigator.geolocation.getCurrentPosition(
-            (position) => {
-                setCenter({
-                lat: position.coords.latitude,
-                lng: position.coords.longitude,
-                });
-                setZoom(12);
-            },
-            () => {
-                console.info("Could not get user location, defaulting to center.");
-            }
-        );
-    }
-  }, [searchParams, openAddDialogAtCurrentLocation]);
-  
-  const handleDialogClose = () => setDialogState(null);
+  /* ---------------------------------------------------------
+     ADD AT CURRENT LOCATION
+  --------------------------------------------------------- */
+  const openAddDialog = useCallback(() => {
+    navigator.geolocation.getCurrentPosition(async (pos) => {
+      const coords = {
+        lat: pos.coords.latitude,
+        lng: pos.coords.longitude
+      };
 
-  const handleFormSuccess = (updatedVoter: Voter, mode: 'add' | 'edit') => {
-    handleDialogClose();
-    if (mode === 'add') {
-      setCenter({ lat: updatedVoter.lat, lng: updatedVoter.lng });
-      setZoom(15);
-    }
-  };
-  
-  const handleMapClick = async (ev: google.maps.MapMouseEvent) => {
-    if (ev.latLng) {
-      const coords = ev.latLng.toJSON();
       const address = await getAddressFromCoords(coords);
-      setDialogState({ 
-        mode: 'add', 
-        voter: null, 
-        coords: coords,
-        address: address,
-      });
-    }
-  };
-  
-  const handleAddClick = () => {
-    openAddDialogAtCurrentLocation();
-  };
-  
-  const handleDelete = async (voterId: string) => {
-    setIsDeleting(true);
-    const result = await deleteVoter(voterId);
-    if (result.success) {
-      toast({ title: "Success", description: "Voter data deleted." });
-      handleDialogClose();
-    } else {
-      toast({ variant: "destructive", title: "Error", description: result.error });
-    }
-    setIsDeleting(false);
-  };
 
-  const onPlaceSelect = useCallback(async (place: google.maps.places.PlaceResult) => {
-    if (place.geometry && place.geometry.location) {
-      const coords = place.geometry.location.toJSON();
       map?.panTo(coords);
       map?.setZoom(15);
-      
+
       setDialogState({
-        mode: 'add',
+        mode: "add",
         voter: null,
         coords,
-        address: place.formatted_address
+        address
       });
-    }
-  }, [map]);
+    });
+  }, [map, getAddressFromCoords]);
 
-  const handleMarkerDragEnd = useCallback(async (coords: { lat: number; lng: number }) => {
-    if (dialogState && (dialogState.mode === 'add' || dialogState.mode === 'edit')) {
-      const address = await getAddressFromCoords(coords);
-      setDialogState({ ...dialogState, coords, address });
-    }
-  }, [dialogState, getAddressFromCoords]);
+  useEffect(() => {
+    if (searchParams.get("add") === "true") openAddDialog();
+  }, [searchParams, openAddDialog]);
 
+  /* ---------------------------------------------------------
+     MAP CLICK = open add dialog
+  --------------------------------------------------------- */
+  const handleMapClick = async (ev: google.maps.MapMouseEvent) => {
+    if (!ev.latLng) return;
+    const coords = ev.latLng.toJSON();
+    const address = await getAddressFromCoords(coords);
 
+    setDialogState({
+      mode: "add",
+      voter: null,
+      coords,
+      address
+    });
+  };
+
+  /* ---------------------------------------------------------
+     VIEW / ADD dialog content
+  --------------------------------------------------------- */
   const renderDialogContent = () => {
     if (!dialogState) return null;
-
     const { mode, voter } = dialogState;
 
-    if (mode === 'view' && voter) {
-        return (
-            <DialogContent>
-                <DialogHeader>
-                    <DialogTitle className="flex items-center gap-2"><User /> Voter Information</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4 py-4 text-sm">
-                    <p><strong>Name:</strong> {voter.name}</p>
-                    <p><strong>Age:</strong> {voter.age}</p>
-                    <p><strong>Party:</strong> <Badge style={{ backgroundColor: PARTY_COLORS[voter.party], color: voter.party === 'White' || voter.party === 'Yellow' ? '#000' : '#fff' }}>{voter.party}</Badge></p>
-                    <p><strong>Address:</strong> {voter.address}</p>
-                    <p><strong># in House:</strong> {voter.peopleInHouse}</p>
-                    <p><strong>Designation:</strong> {voter.designation}</p>
-                    <p><strong>Notes:</strong> {voter.notes || 'N/A'}</p>
-                </div>
-                <div className="flex justify-end gap-2">
-                    <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                            <Button variant="destructive" size="sm"><Trash2 className="mr-2 h-4 w-4" /> Delete</Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                            <AlertDialogHeader>
-                                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                This action cannot be undone. This will permanently delete the voter's data.
-                                </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                                <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => handleDelete(voter.id)} disabled={isDeleting}>
-                                    {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                    Continue
-                                </AlertDialogAction>
-                            </AlertDialogFooter>
-                        </AlertDialogContent>
-                    </AlertDialog>
-                    <Button variant="outline" size="sm" onClick={() => setDialogState({ mode: 'edit', voter, coords: {lat: voter.lat, lng: voter.lng} })}>
-                        <Pencil className="mr-2 h-4 w-4" /> Edit
-                    </Button>
-                </div>
-            </DialogContent>
-        )
+    if (mode === "view" && voter) {
+      const color = PARTY_COLORS[voter.party] ?? DEFAULT_PARTY_COLOR;
+
+      return (
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <User /> Voter Details
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-3 text-sm mt-3">
+            <div><strong>Name:</strong> {voter.name}</div>
+            <div><strong>Age:</strong> {voter.age}</div>
+
+            <div>
+              <strong>Party:</strong>{" "}
+              <Badge style={{ backgroundColor: color, color: "#fff" }}>
+                {voter.party}
+              </Badge>
+            </div>
+
+            <div><strong>Address:</strong> {voter.address}</div>
+            <div><strong>People:</strong> {voter.peopleInHouse}</div>
+            <div><strong>Job:</strong> {voter.designation}</div>
+          </div>
+
+          <div className="flex justify-end gap-2 mt-4">
+            <Button disabled size="sm" variant="outline">
+              <Pencil className="w-4 h-4 mr-2" /> Edit (disabled)
+            </Button>
+            <Button disabled size="sm" variant="destructive">
+              <Trash2 className="w-4 h-4 mr-2" /> Delete (disabled)
+            </Button>
+          </div>
+        </DialogContent>
+      );
     }
 
-    if(mode === 'add' || mode === 'edit') {
-        return (
-            <DialogContent className="max-h-[90vh] overflow-y-auto">
-                <DialogHeader>
-                    <DialogTitle>{mode === 'add' ? 'Add New Voter' : 'Edit Voter'}</DialogTitle>
-                    <DialogDescription>
-                        {mode === 'add' ? 'Enter the details for the new voter. You can drag the marker on the map to adjust the location.' : 'Update the voter\'s information.'}
-                    </DialogDescription>
-                </DialogHeader>
-                <VoterForm 
-                    voter={voter} 
-                    coords={dialogState.coords}
-                    address={dialogState.address}
-                    onSuccess={handleFormSuccess}
-                    onCancel={handleDialogClose}
-                />
-            </DialogContent>
-        )
+    if (mode === "add") {
+      return (
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Voter (Frontend Only)</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Backend API is disabled. Add action is unavailable.
+          </p>
+        </DialogContent>
+      );
     }
+  };
 
-    return null
-  }
-
+  /* ---------------------------------------------------------
+     RENDER MAP UI
+  --------------------------------------------------------- */
   return (
     <div className="w-full h-full relative">
-      <APIProvider apiKey={apiKey} libraries={['places', 'geocoding', 'marker']}>
-        <MapSearch onPlaceSelect={onPlaceSelect} />
-        <Map
-          ref={setMap}
-          mapId={"votemapper-map"}
-          center={center}
-          zoom={zoom}
-          onCenterChanged={(e) => setCenter(e.detail.center)}
-          onZoomChanged={(e) => setZoom(e.detail.zoom)}
-          gestureHandling={"greedy"}
-          disableDefaultUI={true}
-          className="w-full h-full"
-          onClick={handleMapClick}
-        >
-          {isLoadingVoters && <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"><Loader2 className="h-10 w-10 animate-spin" /></div>}
-          {voters?.map((voter) => (
+      <MapSearch onPlaceSelect={() => {}} />
+
+      <Map
+        mapId="votemapper-map"
+        defaultCenter={center}
+        defaultZoom={zoom}
+        gestureHandling="greedy"
+        className="w-full h-full"
+        // onClick={handleMapClick}
+      >
+        {voters.map((v) => {
+          const color = PARTY_COLORS[v.party] ?? DEFAULT_PARTY_COLOR;
+
+          return (
             <AdvancedMarker
-              key={voter.id}
-              position={{ lat: voter.lat, lng: voter.lng }}
-              onClick={() => setDialogState({ mode: 'view', voter, coords: { lat: voter.lat, lng: voter.lng } })}
+              key={v.id}
+              position={{ lat: v.lat, lng: v.lng }}
+              onClick={() =>
+                setDialogState({
+                  mode: "view",
+                  voter: v,
+                  coords: { lat: v.lat, lng: v.lng }
+                })
+              }
             >
-              <MapPin style={{ color: PARTY_COLORS[voter.party], fill: PARTY_COLORS[voter.party] }} size={36} />
+              <MapPin
+                size={32}
+                style={{ color, fill: color }}
+              />
             </AdvancedMarker>
-          ))}
-          {(dialogState?.mode === 'add' || dialogState?.mode === 'edit') && dialogState.coords && (
-             <DraggableNewVoterMarker position={dialogState.coords} onDragEnd={handleMarkerDragEnd} />
-          )}
-        </Map>
-      </APIProvider>
-       <TooltipProvider>
+          );
+        })}
+      </Map>
+
+      <TooltipProvider>
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
               size="lg"
-              className="absolute bottom-6 right-6 z-10 shadow-lg rounded-full h-16 w-16"
-              onClick={handleAddClick}
-              aria-label="Add Voter At Current Location"
+              className="absolute bottom-6 right-6 h-16 w-16 rounded-full shadow-lg"
+              onClick={openAddDialog}
             >
               <MapPinPlus size={32} />
             </Button>
           </TooltipTrigger>
-          <TooltipContent>
-            <p>Add Voter At Current Location</p>
-          </TooltipContent>
+          <TooltipContent>Add new voter</TooltipContent>
         </Tooltip>
       </TooltipProvider>
-      <Dialog open={!!dialogState} onOpenChange={(isOpen) => !isOpen && handleDialogClose()}>
+
+      <Dialog open={!!dialogState} onOpenChange={() => setDialogState(null)}>
         {renderDialogContent()}
       </Dialog>
     </div>
   );
 }
 
+/* ---------------------------------------------------------
+   EXPORT
+--------------------------------------------------------- */
 
-export default function MapContainer(props: MapContainerProps) {
+export default function MapContainer({ apiKey }: MapContainerProps) {
   return (
-    <Suspense fallback={<div className="flex items-center justify-center h-full"><Loader2 className="h-10 w-10 animate-spin" /></div>}>
-      <MapContent {...props} />
+    <Suspense fallback={<Loader2 className="h-10 w-10 animate-spin" />}>
+      <APIProvider apiKey={apiKey} libraries={["places", "geocoding", "marker"]}>
+        <MapContent />
+      </APIProvider>
     </Suspense>
-  )
+  );
 }

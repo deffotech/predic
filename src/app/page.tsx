@@ -4,6 +4,9 @@ import { AppName } from "@/lib/constants";
 import { ArrowRight, LayoutDashboard, Map, MapPin, PlusCircle } from "lucide-react";
 import Link from "next/link";
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export default function Home() {
   return (
     <div className="flex-1 flex items-center justify-center p-4 relative overflow-hidden">

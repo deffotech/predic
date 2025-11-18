@@ -8,6 +8,10 @@ const nextConfig: NextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+  experimental: {
+    // Disabling dynamic rendering optimization to avoid Firebase initialization on server
+    optimizePackageImports: ['firebase'],
+  },
   images: {
     remotePatterns: [
       {
@@ -29,6 +33,10 @@ const nextConfig: NextConfig = {
         pathname: '/**',
       },
     ],
+  },
+  onDemandEntries: {
+    maxInactiveAge: 15 * 1000,
+    pagesBufferLength: 5,
   },
 };
 
