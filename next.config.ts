@@ -8,9 +8,17 @@ const nextConfig: NextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
-  experimental: {
-    // Disabling dynamic rendering optimization to avoid Firebase initialization on server
-    optimizePackageImports: ['firebase'],
+  webpack: (config, { isServer }) => {
+    if (isServer) {
+      config.externals = [
+        ...(Array.isArray(config.externals) ? config.externals : [config.externals].filter(Boolean)),
+        'firebase',
+        'firebase/app',
+        'firebase/auth',
+        'firebase/firestore',
+      ];
+    }
+    return config;
   },
   images: {
     remotePatterns: [

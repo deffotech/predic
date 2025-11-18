@@ -12,17 +12,17 @@ import { Bar, BarChart, XAxis, YAxis } from 'recharts';
 import { PARTY_COLORS, PARTY_COLORS_HSL } from '@/lib/constants';
 import { Badge } from '../ui/badge';
 import { format } from 'date-fns';
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection } from 'firebase/firestore';
+// import { collection } from 'firebase/firestore';
+// import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 
 type DashboardClientProps = {
   initialVoters: Voter[];
 };
 
 export default function DashboardClient({ initialVoters }: DashboardClientProps) {
-  const firestore = useFirestore();
-  const votersQuery = useMemoFirebase(() => firestore && collection(firestore, 'voters'), [firestore]);
-  const { data: voters, isLoading: isLoadingVoters } = useCollection<Voter>(votersQuery);
+  // Temporarily use initial voters only - Firebase connection disabled
+  const voters = initialVoters;
+  const isLoadingVoters = false;
 
   const stats = useMemo(() => {
     const voterData = voters || [];
