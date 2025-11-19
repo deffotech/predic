@@ -14,7 +14,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { MapPin, Loader2, MapPinPlus, Pencil, Trash2, User } from "lucide-react";
 
-import { PARTY_COLORS, DEFAULT_PARTY_COLOR } from "@/lib/constants";
+import { PARTY_COLORS } from "@/lib/constants";
+
+const DEFAULT_PARTY_COLOR = "#333333";
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
